@@ -22,16 +22,15 @@ func NewConnectionFactory(configFile string, migrate bool, debug bool) (Connecti
 	}
 
 	dbToUse := viper.GetString("db.driver")
-	blockQueries := viper.GetBool("db.blockQueries")
 	logQueries := viper.GetBool("db.logQueries")
 
 	switch dbToUse {
 	case "postgres":
-		connFact := createPostgresConnectionFactory(encKey, debug, blockQueries, logQueries)
+		connFact := createPostgresConnectionFactory(encKey, debug, logQueries)
 		return connFact, connFact.Init(migrate)
 
 	case "sqlite":
-		connFact, err := createSqliteConnectionFactory(encKey, debug, blockQueries, logQueries)
+		connFact, err := createSqliteConnectionFactory(encKey, debug, logQueries)
 		if err != nil {
 			return nil, errors.Wrap(err, "error creating sqliteConnectionFactory")
 		}
@@ -64,7 +63,7 @@ func readEncryptionKey() (string, error) {
 	return readKeyFile(encKeyFile)
 }
 
-func createSqliteConnectionFactory(encKey string, debug bool, blockQueries, logQueries bool) (*sqliteConnectionFactory, error) {
+func createSqliteConnectionFactory(encKey string, debug bool, logQueries bool) (*sqliteConnectionFactory, error) {
 	dbFile := viper.GetString("db.sqlite.file")
 	//ensure directory structure of db-file exists
 	dbFileDir := filepath.Dir(dbFile)
@@ -78,7 +77,6 @@ func createSqliteConnectionFactory(encKey string, debug bool, blockQueries, logQ
 		debug:         debug,
 		reset:         viper.GetBool("db.sqlite.resetDatabase"),
 		encryptionKey: encKey,
-		blockQueries:  blockQueries,
 		logQueries:    logQueries,
 	}
 	if viper.GetBool("db.sqlite.deploySchema") {
@@ -87,7 +85,7 @@ func createSqliteConnectionFactory(encKey string, debug bool, blockQueries, logQ
 	return connFact, nil
 }
 
-func createPostgresConnectionFactory(encKey string, debug bool, blockQueries, logQueries bool) *postgresConnectionFactory {
+func createPostgresConnectionFactory(encKey string, debug bool, logQueries bool) *postgresConnectionFactory {
 	host := viper.GetString("db.postgres.host")
 	port := viper.GetInt("db.postgres.port")
 	database := viper.GetString("db.postgres.database")
@@ -127,7 +125,6 @@ func createPostgresConnectionFactory(encKey string, debug bool, blockQueries, lo
 		sslMode:       sslMode,
 		encryptionKey: encKey,
 		migrationsDir: migrationsDir,
-		blockQueries:  blockQueries,
 		logQueries:    logQueries,
 		debug:         debug,
 	}

@@ -3,7 +3,6 @@ db:
   driver: postgres
   encryption:
     keyFile: "./encryption/unittest.key"
-  blockQueries: true
   logQueries: true
   postgres:
     host: "127.0.0.1"

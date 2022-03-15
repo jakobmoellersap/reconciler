@@ -19,11 +19,10 @@ type sqliteConnection struct {
 	id        string
 	db        *sql.DB
 	encryptor *Encryptor
-	validator *Validator
 	logger    *zap.SugaredLogger
 }
 
-func newSqliteConnection(db *sql.DB, encKey string, debug bool, blockQueries bool) (*sqliteConnection, error) {
+func newSqliteConnection(db *sql.DB, encKey string, debug bool) (*sqliteConnection, error) {
 	logger := log.NewLogger(debug)
 
 	encryptor, err := NewEncryptor(encKey)
@@ -31,13 +30,10 @@ func newSqliteConnection(db *sql.DB, encKey string, debug bool, blockQueries boo
 		return nil, err
 	}
 
-	validator := NewValidator(blockQueries, logger)
-
 	return &sqliteConnection{
 		id:        uuid.NewString(),
 		db:        db,
 		encryptor: encryptor,
-		validator: validator,
 		logger:    logger,
 	}, nil
 }
@@ -61,17 +57,11 @@ func (sc *sqliteConnection) Ping() error {
 
 func (sc *sqliteConnection) QueryRow(query string, args ...interface{}) (DataRow, error) {
 	sc.logger.Debugf("Sqlite3 QueryRow(): %s | %v", query, args)
-	if err := sc.validator.Validate(query); err != nil {
-		return nil, err
-	}
 	return sc.db.QueryRow(query, args...), nil
 }
 
 func (sc *sqliteConnection) Query(query string, args ...interface{}) (DataRows, error) {
 	sc.logger.Debugf("Sqlite3 Query(): %s | %v", query, args)
-	if err := sc.validator.Validate(query); err != nil {
-		return nil, err
-	}
 	rows, err := sc.db.Query(query, args...)
 	if err != nil {
 		sc.logger.Errorf("Sqlite3 Query() error: %s", err)
@@ -81,9 +71,6 @@ func (sc *sqliteConnection) Query(query string, args ...interface{}) (DataRows, 
 
 func (sc *sqliteConnection) Exec(query string, args ...interface{}) (sql.Result, error) {
 	sc.logger.Debugf("Sqlite3 Exec(): %s | %v", query, args)
-	if err := sc.validator.Validate(query); err != nil {
-		return nil, err
-	}
 	result, err := sc.db.Exec(query, args...)
 	if err != nil {
 		sc.logger.Errorf("Sqlite3 Exec() error: %s", err)
@@ -115,7 +102,6 @@ type sqliteConnectionFactory struct {
 	reset         bool
 	schemaFile    string
 	encryptionKey string
-	blockQueries  bool
 	logQueries    bool
 }
 
@@ -156,7 +142,7 @@ func (scf *sqliteConnectionFactory) NewConnection() (Connection, error) {
 		return nil, err
 	}
 
-	return newSqliteConnection(db, scf.encryptionKey, scf.logQueries, scf.blockQueries) //connection ready to use
+	return newSqliteConnection(db, scf.encryptionKey, scf.logQueries) //connection ready to use
 }
 
 func (scf *sqliteConnectionFactory) resetFile() error {

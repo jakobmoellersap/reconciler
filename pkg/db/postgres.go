@@ -49,11 +49,10 @@ type postgresConnection struct {
 	id        string
 	db        *sql.DB
 	encryptor *Encryptor
-	validator *Validator
 	logger    *zap.SugaredLogger
 }
 
-func newPostgresConnection(db *sql.DB, encryptionKey string, debug bool, blockQueries bool) (*postgresConnection, error) {
+func newPostgresConnection(db *sql.DB, encryptionKey string, debug bool) (*postgresConnection, error) {
 	logger := log.NewLogger(debug)
 
 	encryptor, err := NewEncryptor(encryptionKey)
@@ -61,13 +60,10 @@ func newPostgresConnection(db *sql.DB, encryptionKey string, debug bool, blockQu
 		return nil, err
 	}
 
-	validator := NewValidator(blockQueries, logger)
-
 	return &postgresConnection{
 		db:        db,
 		id:        uuid.NewString(),
 		encryptor: encryptor,
-		validator: validator,
 		logger:    logger,
 	}, nil
 }
@@ -91,17 +87,11 @@ func (pc *postgresConnection) Ping() error {
 
 func (pc *postgresConnection) QueryRow(query string, args ...interface{}) (DataRow, error) {
 	pc.logger.Debugf("Postgres QueryRow(): %s | %v", query, args)
-	if err := pc.validator.Validate(query); err != nil {
-		return nil, err
-	}
 	return pc.db.QueryRow(query, args...), nil
 }
 
 func (pc *postgresConnection) Query(query string, args ...interface{}) (DataRows, error) {
 	pc.logger.Debugf("Postgres Query(): %s | %v", query, args)
-	if err := pc.validator.Validate(query); err != nil {
-		return nil, err
-	}
 	rows, err := pc.db.Query(query, args...)
 	if err != nil {
 		pc.logger.Errorf("Postgres Query() error: %s", err)
@@ -111,9 +101,6 @@ func (pc *postgresConnection) Query(query string, args ...interface{}) (DataRows
 
 func (pc *postgresConnection) Exec(query string, args ...interface{}) (sql.Result, error) {
 	pc.logger.Debugf("Postgres Exec(): %s | %v", query, args)
-	if err := pc.validator.Validate(query); err != nil {
-		return nil, err
-	}
 	result, err := pc.db.Exec(query, args...)
 	if err != nil {
 		pc.logger.Errorf("Postgres Exec() error: %s", err)
@@ -149,7 +136,6 @@ type postgresConnectionFactory struct {
 	encryptionKey string
 	migrationsDir string
 	debug         bool
-	blockQueries  bool
 	logQueries    bool
 }
 
@@ -184,7 +170,7 @@ func (pcf *postgresConnectionFactory) NewConnection() (Connection, error) {
 		return nil, err
 	}
 
-	return newPostgresConnection(db, pcf.encryptionKey, pcf.logQueries, pcf.blockQueries)
+	return newPostgresConnection(db, pcf.encryptionKey, pcf.logQueries)
 }
 
 func (pcf *postgresConnectionFactory) checkPostgresIsolationLevel() error {
