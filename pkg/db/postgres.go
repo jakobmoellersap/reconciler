@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/google/uuid"
-
 	log "github.com/kyma-incubator/reconciler/pkg/logger"
 	"github.com/pkg/errors"
 
@@ -86,11 +85,19 @@ func (pc *postgresConnection) Ping() error {
 }
 
 func (pc *postgresConnection) QueryRow(query string, args ...interface{}) (DataRow, error) {
+	query, args, conversionErr := pc.convertNamedToPositionalArgs(query, args...)
+	if conversionErr != nil {
+		pc.logger.Errorf("Postgres ArgConversion() error: %s", conversionErr)
+	}
 	pc.logger.Debugf("Postgres QueryRow(): %s | %v", query, args)
 	return pc.db.QueryRow(query, args...), nil
 }
 
 func (pc *postgresConnection) Query(query string, args ...interface{}) (DataRows, error) {
+	query, args, conversionErr := pc.convertNamedToPositionalArgs(query, args...)
+	if conversionErr != nil {
+		pc.logger.Errorf("Postgres ArgConversion() error: %s", conversionErr)
+	}
 	pc.logger.Debugf("Postgres Query(): %s | %v", query, args)
 	rows, err := pc.db.Query(query, args...)
 	if err != nil {
@@ -100,6 +107,10 @@ func (pc *postgresConnection) Query(query string, args ...interface{}) (DataRows
 }
 
 func (pc *postgresConnection) Exec(query string, args ...interface{}) (sql.Result, error) {
+	query, args, conversionErr := pc.convertNamedToPositionalArgs(query, args...)
+	if conversionErr != nil {
+		pc.logger.Errorf("Postgres ArgConversion() error: %s", conversionErr)
+	}
 	pc.logger.Debugf("Postgres Exec(): %s | %v", query, args)
 	result, err := pc.db.Exec(query, args...)
 	if err != nil {

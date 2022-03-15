@@ -495,11 +495,11 @@ func (i *DefaultInventory) filterClusters(filters ...statusSQLFilter) ([]*State,
 	if len(filters) == 0 {
 		details, dbErr = qs.GetMany()
 	} else {
-		statusFilterSQL, filterErr := i.buildStatusFilterSQL(filters, colHandler)
+		statusFilterSQL, statusFilterArgs, filterErr := i.buildStatusFilterSQL(filters, colHandler)
 		if filterErr != nil {
 			return nil, filterErr
 		}
-		details, dbErr = qs.WhereRaw(statusFilterSQL).GetMany()
+		details, dbErr = qs.WhereRaw(statusFilterSQL, statusFilterArgs...).GetMany()
 	}
 	if dbErr != nil {
 		return nil, dbErr
@@ -514,21 +514,26 @@ func (i *DefaultInventory) filterClusters(filters ...statusSQLFilter) ([]*State,
 	return states, nil
 }
 
-func (i *DefaultInventory) buildStatusFilterSQL(filters []statusSQLFilter, statusColHandler *db.ColumnHandler) (string, error) {
+func (i *DefaultInventory) buildStatusFilterSQL(filters []statusSQLFilter, statusColHandler *db.ColumnHandler) (string, []interface{}, error) {
 	var sqlFilterStmt bytes.Buffer
+	args := *new([]interface{})
 	for _, filter := range filters {
 		sqlCond, err := filter.Filter(i.Conn.Type(), statusColHandler)
 		if err != nil {
-			return "", err
+			return "", []interface{}{}, err
 		}
 		if sqlFilterStmt.Len() > 0 {
 			sqlFilterStmt.WriteString(" OR ")
 		}
 		sqlFilterStmt.WriteRune('(')
-		sqlFilterStmt.WriteString(sqlCond)
+		sqlFilterStmt.WriteString(sqlCond.sql)
+		args = append(args, sqlCond.args...)
 		sqlFilterStmt.WriteRune(')')
 	}
-	return sqlFilterStmt.String(), nil
+
+	sqlFilterStmtString := sqlFilterStmt.String()
+
+	return sqlFilterStmtString, args, nil
 }
 
 func (i *DefaultInventory) StatusChanges(runtimeID string, offset time.Duration) ([]*StatusChange, error) {
